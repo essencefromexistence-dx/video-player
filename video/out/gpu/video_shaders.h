@@ -19,9 +19,12 @@
 #define MP_GL_VIDEO_SHADERS_H
 
 #include <libavutil/lfg.h>
+#include <stdbool.h>
 
 #include "utils.h"
 #include "video.h"
+
+extern const struct gl_liquid_glass_opts gl_liquid_glass_opts_def;
 
 struct deband_opts {
     int iterations;
@@ -56,5 +59,8 @@ void pass_sample_deband(struct gl_shader_cache *sc, struct deband_opts *opts,
                         AVLFG *lfg, enum pl_color_transfer trc);
 
 void pass_sample_unsharp(struct gl_shader_cache *sc, float param);
+
+void pass_draw_liquid_glass(struct gl_shader_cache *sc,
+                            const struct gl_liquid_glass_opts *opts);
 
 #endif

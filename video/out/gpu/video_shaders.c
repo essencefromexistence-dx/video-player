@@ -1037,3 +1037,157 @@ void pass_sample_unsharp(struct gl_shader_cache *sc, float param) {
     GLSLF("color = p + t * %f;\n", param);
     GLSLF("}\n");
 }
+
+const struct gl_liquid_glass_opts gl_liquid_glass_opts_def = {
+    .enabled = false,
+    .power_factor = 2.049f,
+    .width = 3.5f,
+    .height = 3.5f,
+    .blur_radius = 2.0f,
+    .blur_iters = 0,
+    .noise = 0.06f,
+    .fpower = 1.0f,
+    .a = 0.7f,
+    .b = 2.3f,
+    .c = 5.2f,
+    .d = 6.9f,
+    .glow_weight = 0.266f,
+    .glow_bias = 0.0f,
+    .glow_edge0 = 0.5f,
+    .glow_edge1 = -0.5f,
+};
+
+void pass_draw_liquid_glass(struct gl_shader_cache *sc,
+                            const struct gl_liquid_glass_opts *opts)
+{
+    if (!opts->enabled)
+        return;
+
+    GLSLF("// Liquid glass overlay\n");
+    GLSLF("{\n");
+
+    // Emit helper functions in header
+    GLSLHF("// Liquid glass helpers\n");
+    GLSLHF("#define LG_M_E 2.718281828459045\n");
+    GLSLHF("float lg_sdSuperellipse(vec2 p, float n, float r) {\n");
+    GLSLH(vec2 p_abs = abs(p);)
+    GLSLH(float numerator = pow(p_abs.x, n) + pow(p_abs.y, n) - pow(r, n);)
+    GLSLH(float den_x = pow(p_abs.x, 2.0 * n - 2.0);)
+    GLSLH(float den_y = pow(p_abs.y, 2.0 * n - 2.0);)
+    GLSLH(float denominator = n * sqrt(den_x + den_y) + 0.00001;)
+    GLSLH(return numerator / denominator;)
+    GLSLHF("}\n");
+
+    GLSLHF("float lg_f(float x, float u_a, float u_b, float u_c, float u_d) {\n");
+    GLSLH(return 1.0 - u_b * pow(u_c * LG_M_E, -u_d * x - u_a);)
+    GLSLHF("}\n");
+
+    GLSLHF("float lg_rand(vec2 co) {\n");
+    GLSLH(return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);)
+    GLSLHF("}\n");
+
+    // Set uniforms
+    GLSLF("float u_powerFactor = %f;\n", opts->power_factor);
+    GLSLF("float u_width = %f;\n", opts->width);
+    GLSLF("float u_height = %f;\n", opts->height);
+    GLSLF("float u_blurRadius = %f;\n", opts->blur_radius);
+    GLSLF("int u_blurIters = %d;\n", opts->blur_iters);
+    GLSLF("float u_noise = %f;\n", opts->noise);
+    GLSLF("float u_fPower = %f;\n", opts->fpower);
+    GLSLF("float u_a = %f;\n", opts->a);
+    GLSLF("float u_b = %f;\n", opts->b);
+    GLSLF("float u_c = %f;\n", opts->c);
+    GLSLF("float u_d = %f;\n", opts->d);
+    GLSLF("float u_glowWeight = %f;\n", opts->glow_weight);
+    GLSLF("float u_glowBias = %f;\n", opts->glow_bias);
+    GLSLF("float u_glowEdge0 = %f;\n", opts->glow_edge0);
+    GLSLF("float u_glowEdge1 = %f;\n", opts->glow_edge1);
+
+    // Save original video pixel and sample at center
+    GLSL(vec4 video_pixel = HOOKED_tex(HOOKED_pos);)
+    GLSL(color = video_pixel;)
+
+    // Main shader body
+    GLSL(vec2 raw_pos = HOOKED_pos;)
+
+    // Compute centered NDC position, aspect-corrected
+    GLSL(vec2 p = raw_pos * 2.0 - 1.0;)
+    GLSL(float aspect = HOOKED_size.y / HOOKED_size.x;)
+    GLSL(p.x *= aspect;)
+
+    // Glass element size in NDC
+    GLSL(vec2 glassSize = vec2(u_width, u_height) * 0.1;)
+    GLSL(glassSize.x *= aspect;)
+    GLSL(vec2 localP = p / glassSize;)
+    GLSL(float d = lg_sdSuperellipse(localP, u_powerFactor, 1.0);)
+
+    // Outside the squircle -> keep original video
+    GLSLF("if (d > 0.0) { }\n");
+    GLSLF("else {\n");
+
+    // Inside: apply refraction, noise, glow
+    GLSL(float dist = -d;)
+
+    // Refraction displacement
+    GLSL(float f_val = lg_f(dist, u_a, u_b, u_c, u_d);)
+    GLSL(float refr = pow(f_val, u_fPower);)
+    GLSL(vec2 sampleLocal = localP * refr;)
+    GLSL(vec2 sampleNDC = sampleLocal * glassSize;)
+    GLSL(sampleNDC.x /= aspect;)
+    GLSL(vec2 sampleUV = sampleNDC * 0.5 + 0.5;)
+
+    // Sample the frame at the refracted position
+    GLSL(vec4 refracted = texture(HOOKED_raw, sampleUV);)
+
+    // Apply simple blur if blur_iters > 0
+    GLSLF("if (u_blurIters > 0) {\n");
+    GLSL(vec2 blurDir = vec2(1.0, 0.0);)
+    GLSL(vec2 off1 = vec2(1.411764705882353) * u_blurRadius * blurDir * HOOKED_pt;)
+    GLSL(vec2 off2 = vec2(3.2941176470588234) * u_blurRadius * blurDir * HOOKED_pt;)
+    GLSL(vec2 off3 = vec2(5.176470588235294) * u_blurRadius * blurDir * HOOKED_pt;)
+    GLSL(vec4 blurH = refracted * 0.1964825501511404;)
+    GLSL(blurH += texture(HOOKED_raw, sampleUV + off1) * 0.2969069646728344;)
+    GLSL(blurH += texture(HOOKED_raw, sampleUV - off1) * 0.2969069646728344;)
+    GLSL(blurH += texture(HOOKED_raw, sampleUV + off2) * 0.09447039785044732;)
+    GLSL(blurH += texture(HOOKED_raw, sampleUV - off2) * 0.09447039785044732;)
+    GLSL(blurH += texture(HOOKED_raw, sampleUV + off3) * 0.010381362401148057;)
+    GLSL(blurH += texture(HOOKED_raw, sampleUV - off3) * 0.010381362401148057;)
+    GLSL(vec2 blurDirV = vec2(0.0, 1.0);)
+    GLSL(vec2 voff1 = vec2(1.411764705882353) * u_blurRadius * blurDirV * HOOKED_pt;)
+    GLSL(vec2 voff2 = vec2(3.2941176470588234) * u_blurRadius * blurDirV * HOOKED_pt;)
+    GLSL(vec2 voff3 = vec2(5.176470588235294) * u_blurRadius * blurDirV * HOOKED_pt;)
+    GLSL(vec4 blurV = blurH * 0.1964825501511404;)
+    GLSL(blurV += texture(HOOKED_raw, sampleUV + voff1) * 0.2969069646728344;)
+    GLSL(blurV += texture(HOOKED_raw, sampleUV - voff1) * 0.2969069646728344;)
+    GLSL(blurV += texture(HOOKED_raw, sampleUV + voff2) * 0.09447039785044732;)
+    GLSL(blurV += texture(HOOKED_raw, sampleUV - voff2) * 0.09447039785044732;)
+    GLSL(blurV += texture(HOOKED_raw, sampleUV + voff3) * 0.010381362401148057;)
+    GLSL(blurV += texture(HOOKED_raw, sampleUV - voff3) * 0.010381362401148057;)
+    GLSL(refracted = blurV;)
+    GLSLF("}\n");
+
+    // Out of bounds check: use original color if refracted UV is outside frame
+    GLSLF("if (max(sampleUV.x, sampleUV.y) > 1.0 || min(sampleUV.x, sampleUV.y) < 0.0) {\n");
+    GLSLF("} else {\n");
+
+    // Noise
+    GLSL(float noise_val = (lg_rand(gl_FragCoord.xy) - 0.5) * u_noise;)
+    GLSL(refracted.rgb += noise_val;)
+
+    // Glow - edge glow based on angle and distance
+    GLSL(float phi = atan(localP.y, localP.x);)
+    GLSL(float glow_val = sin(phi - 0.5);)
+    GLSLF("float e0 = %f, e1 = %f;\n", opts->glow_edge0, opts->glow_edge1);
+    GLSLF("float edge_factor;\n");
+    GLSLF("if (e0 < e1) {\n");
+    GLSL(edge_factor = smoothstep(e0, e1, dist);)
+    GLSLF("} else {\n");
+    GLSL(edge_factor = 1.0 - smoothstep(e1, e0, dist);)
+    GLSLF("}\n");
+    GLSL(float mul = glow_val * u_glowWeight * edge_factor + 1.0 + u_glowBias;)
+    GLSL(color = refracted * vec4(vec3(mul), 1.0);)
+
+    GLSLF("}\n"); // end out-of-bounds else
+    GLSLF("}\n"); // end d > 0 else
+    GLSLF("}\n"); // end block
+}

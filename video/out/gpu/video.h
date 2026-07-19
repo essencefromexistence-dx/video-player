@@ -28,6 +28,22 @@
 #include "video/csputils.h"
 #include "video/out/filter_kernels.h"
 
+struct gl_liquid_glass_opts {
+    bool enabled;
+    float power_factor;
+    float width;
+    float height;
+    float blur_radius;
+    int blur_iters;
+    float noise;
+    float fpower;
+    float a, b, c, d;
+    float glow_weight;
+    float glow_bias;
+    float glow_edge0;
+    float glow_edge1;
+};
+
 struct scaler_fun {
     int function;
     float params[2];
@@ -172,6 +188,7 @@ struct gl_video_opts {
     bool deband;
     struct deband_opts *deband_opts;
     float unsharp;
+    struct gl_liquid_glass_opts liquid_glass;
     int tex_pad_x, tex_pad_y;
     struct mp_icc_opts *icc_opts;
     bool shader_cache;

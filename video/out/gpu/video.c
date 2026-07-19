@@ -406,6 +406,24 @@ static const struct gl_video_opts gl_video_opts_def = {
         .scene_threshold_high = 3.0,
         .contrast_smoothness = 3.5,
     },
+    .liquid_glass = {
+        .enabled = true,
+        .power_factor = 2.049f,
+        .width = 3.5f,
+        .height = 3.5f,
+        .blur_radius = 2.0f,
+        .blur_iters = 0,
+        .noise = 0.06f,
+        .fpower = 1.0f,
+        .a = 0.7f,
+        .b = 2.3f,
+        .c = 5.2f,
+        .d = 6.9f,
+        .glow_weight = 0.266f,
+        .glow_bias = 0.0f,
+        .glow_edge0 = 0.5f,
+        .glow_edge1 = -0.5f,
+    },
     .early_flush = -1,
     .shader_cache = true,
     .hwdec_interop = "auto",
@@ -550,6 +568,22 @@ const struct m_sub_options gl_video_conf = {
         {"deband", OPT_BOOL(deband)},
         {"deband", OPT_SUBSTRUCT(deband_opts, deband_conf)},
         {"sharpen", OPT_FLOAT(unsharp)},
+        {"liquid-glass", OPT_BOOL(liquid_glass.enabled)},
+        {"liquid-glass-power", OPT_FLOAT(liquid_glass.power_factor), M_RANGE(1.001, 6.0)},
+        {"liquid-glass-width", OPT_FLOAT(liquid_glass.width), M_RANGE(0.0, 10.0)},
+        {"liquid-glass-height", OPT_FLOAT(liquid_glass.height), M_RANGE(0.0, 10.0)},
+        {"liquid-glass-blur-radius", OPT_FLOAT(liquid_glass.blur_radius), M_RANGE(0.0, 10.0)},
+        {"liquid-glass-blur-iters", OPT_INT(liquid_glass.blur_iters), M_RANGE(0, 10)},
+        {"liquid-glass-noise", OPT_FLOAT(liquid_glass.noise), M_RANGE(0.0, 0.3)},
+        {"liquid-glass-fpower", OPT_FLOAT(liquid_glass.fpower), M_RANGE(-1.5, 6.0)},
+        {"liquid-glass-a", OPT_FLOAT(liquid_glass.a), M_RANGE(0.0, 5.0)},
+        {"liquid-glass-b", OPT_FLOAT(liquid_glass.b), M_RANGE(0.0, 6.0)},
+        {"liquid-glass-c", OPT_FLOAT(liquid_glass.c), M_RANGE(0.0, 6.0)},
+        {"liquid-glass-d", OPT_FLOAT(liquid_glass.d), M_RANGE(0.0, 10.0)},
+        {"liquid-glass-glow-weight", OPT_FLOAT(liquid_glass.glow_weight), M_RANGE(-1.0, 1.0)},
+        {"liquid-glass-glow-bias", OPT_FLOAT(liquid_glass.glow_bias), M_RANGE(-1.0, 1.0)},
+        {"liquid-glass-glow-edge0", OPT_FLOAT(liquid_glass.glow_edge0), M_RANGE(-1.0, 1.0)},
+        {"liquid-glass-glow-edge1", OPT_FLOAT(liquid_glass.glow_edge1), M_RANGE(-1.0, 1.0)},
         {"gpu-tex-pad-x", OPT_INT(tex_pad_x), M_RANGE(0, 4096)},
         {"gpu-tex-pad-y", OPT_INT(tex_pad_y), M_RANGE(0, 4096)},
         {"", OPT_SUBSTRUCT(icc_opts, mp_icc_conf)},
@@ -2069,6 +2103,13 @@ static void unsharp_hook(struct gl_video *p, struct image img,
     pass_sample_unsharp(p->sc, p->opts.unsharp);
 }
 
+static void liquid_glass_hook(struct gl_video *p, struct image img,
+                              struct gl_transform *trans, void *priv)
+{
+    pass_describe(p, "liquid glass overlay");
+    pass_draw_liquid_glass(p->sc, &p->opts.liquid_glass);
+}
+
 struct szexp_ctx {
     struct gl_video *p;
     struct image img;
@@ -2303,6 +2344,14 @@ static void gl_video_setup_hooks(struct gl_video *p)
             .hook_tex = {"MAIN"},
             .bind_tex = {"HOOKED"},
             .hook = unsharp_hook,
+        });
+    }
+
+    if (p->opts.liquid_glass.enabled) {
+        MP_TARRAY_APPEND(p, p->tex_hooks, p->num_tex_hooks, (struct tex_hook) {
+            .hook_tex = {"OUTPUT"},
+            .bind_tex = {"HOOKED"},
+            .hook = liquid_glass_hook,
         });
     }
 
