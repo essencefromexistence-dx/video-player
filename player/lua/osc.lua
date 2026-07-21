@@ -59,7 +59,7 @@ local user_opts = {
     floatingtitle = true,         -- show title in the floating layout?
     floatingwidth = 700,          -- width of the floating layout
     floatingalpha = 105,          -- alpha of the floating layout background
-    tracknumberswidth = 35,       -- width for track number labels (0 = icon only)
+    tracknumberswidth = 0,       -- width for track number labels (0 = icon only)
     greenandgrumpy = false,     -- disable santa hat
     chapter_fmt = "Chapter: %s", -- chapter print format for seekbar-hover. "no" to disable
     unicodeminus = false,       -- whether to use the Unicode minus sign character
@@ -1964,6 +1964,7 @@ local function bar_layout(direction, slim)
         local t_l = geo.x + geo.w + padX
         local t_r = osc_geo.x + osc_geo.w
 
+        --[[
         for i = last_custom_button, 1, -1 do
             t_r = t_r - padX
             geo = { x = t_r, y = geo.y, an = 6, w = geo.w, h = geo.h }
@@ -1975,6 +1976,7 @@ local function bar_layout(direction, slim)
                 lo.hitbox = { x2 = math.huge }
             end
         end
+        --]]
 
         t_r = t_r - padX
 
@@ -2047,8 +2049,12 @@ local function bar_layout(direction, slim)
     -- Layout order: [menu, plP, plN, PP, chP, chN] [title...] [audio, sub, vol, fs, tc_left, tc_right]
     --==========================================================================
 
-    -- Custom buttons (far right)
+    -- RIGHT GROUP (right to left, zero gaps)
     local ctrl_xR = osc_geo.x + osc_geo.w - padX - padwc_r
+    local rg = 0  -- no gap between right items
+
+    -- Custom buttons (disabled for now)
+    --[[
     for i = last_custom_button, 1, -1 do
         ctrl_xR = ctrl_xR - padX
         geo = { x = ctrl_xR, y = ctrl_row, an = 6, w = buttonW, h = ctrl_h }
@@ -2060,22 +2066,8 @@ local function bar_layout(direction, slim)
             lo.hitbox = { x2 = math.huge }
         end
     end
-    ctrl_xR = ctrl_xR - padX
-
-    -- RIGHT GROUP (right to left): timecodes, fullscreen, volume, sub, audio
-    -- Right timecode
-    geo = { x = ctrl_xR, y = ctrl_row, an = 6, w = tcW, h = ctrl_h }
-    lo = add_layout("tc_right")
-    lo.geometry = geo
-    lo.style = osc_styles.timecodes
-    ctrl_xR = ctrl_xR - geo.w - padX
-
-    -- Left timecode
-    geo = { x = ctrl_xR, y = ctrl_row, an = 6, w = tcW, h = ctrl_h }
-    lo = add_layout("tc_left")
-    lo.geometry = geo
-    lo.style = osc_styles.timecodes
-    ctrl_xR = ctrl_xR - geo.w - padX
+    ctrl_xR = ctrl_xR - rg
+    --]]
 
     -- Fullscreen
     geo = { x = ctrl_xR, y = ctrl_row, an = 6, w = buttonW, h = ctrl_h }
@@ -2083,35 +2075,30 @@ local function bar_layout(direction, slim)
     lo.geometry = geo
     lo.style = osc_styles.smallButtonsBar
     lo.hitbox = { x2 = math.huge }
-    ctrl_xR = ctrl_xR - geo.w - padX
+    ctrl_xR = ctrl_xR - geo.w - rg
 
-    -- Volume
+    -- Volume (explicit hitbox covering icon + right edge)
     geo = { x = ctrl_xR, y = ctrl_row, an = 6, w = buttonW, h = ctrl_h }
     lo = add_layout("volume")
     lo.geometry = geo
     lo.style = osc_styles.smallButtonsBar
-    ctrl_xR = ctrl_xR - geo.w - padX
+    lo.hitbox = { x1 = ctrl_xR - buttonW, x2 = ctrl_xR,
+                  y1 = ctrl_row - ctrl_h / 2, y2 = ctrl_row + ctrl_h / 2 }
+    ctrl_xR = ctrl_xR - geo.w - rg
 
-    -- Subtitle track
-    geo = { x = ctrl_xR, y = ctrl_row, an = 6, w = tsW, h = ctrl_h }
-    lo = add_layout("sub_track")
+    -- Combined timecode (current / total) — right after volume
+    geo = { x = ctrl_xR, y = ctrl_row, an = 6, w = 150, h = ctrl_h }
+    lo = add_layout("tc_combined")
     lo.geometry = geo
-    lo.style = osc_styles.smallButtonsBar
-    ctrl_xR = ctrl_xR - geo.w - padX
+    lo.style = osc_styles.timecodes
+    ctrl_xR = ctrl_xR - geo.w - rg
 
-    -- Audio track
-    geo = { x = ctrl_xR, y = ctrl_row, an = 6, w = tsW, h = ctrl_h }
-    lo = add_layout("audio_track")
-    lo.geometry = geo
-    lo.style = osc_styles.smallButtonsBar
-    ctrl_xR = ctrl_xR - geo.w - padX
-
-    -- Cache (after audio track if no window controls)
+    -- Cache (if not using window controls)
     if not window_controls_enabled() or direction < 0 then
         lo = add_layout("cache")
         lo.geometry = { x = ctrl_xR, y = ctrl_row, an = 6, w = 150, h = ctrl_h }
         lo.style = osc_styles.vidtitleBar
-        ctrl_xR = ctrl_xR - 150 - padX
+        ctrl_xR = ctrl_xR - 150 - rg
     end
 
     -- LEFT GROUP: menu, playlist, playback controls
@@ -2362,13 +2349,15 @@ layouts["floating"] = function ()
     lo.style = osc_styles.floatingButtons
     ll = ll + btn_size + btn_pad
 
-    -- Custom buttons
+    -- Custom buttons (disabled)
+    --[[
     for i = 1, last_custom_button do
         lo = add_layout("custom_button_" .. i)
         lo.geometry = {x = ll, y = ctrl_pos, an = 4, w = btn_size, h = btn_size  }
         lo.style = osc_styles.vidtitleBar
         ll = ll + btn_size + btn_pad
     end
+    --]]
 
     -- Control row - right
     local rr = x + half_w - btn_size / 2
@@ -2536,7 +2525,8 @@ local function osc_init()
     local label_style = user_opts.layout == "floating" and osc_styles.floatingButtonslabel
                                                         or osc_styles.smallButtonsLlabel
 
-    --audio_track
+    --audio_track (disabled)
+    --[[
     ne = new_element("audio_track", "button")
 
     ne.enabled = state.audio_track_count > 0
@@ -2551,8 +2541,10 @@ local function osc_init()
                                                 or track .. "/" .. count)
     end
     bind_mouse_buttons("audio_track")
+    --]]
 
-    --sub_track
+    --sub_track (disabled)
+    --[[
     ne = new_element("sub_track", "button")
 
     ne.enabled = state.sub_track_count > 0
@@ -2567,6 +2559,7 @@ local function osc_init()
                                                 or track .. "/" .. count)
     end
     bind_mouse_buttons("sub_track")
+    --]]
 
     --fullscreen
     ne = new_element("fullscreen", "button")
@@ -2674,41 +2667,23 @@ local function osc_init()
     end
 
 
-    -- tc_left (current pos)
-    ne = new_element("tc_left", "button")
+    -- tc_combined (current / total time, compact)
+    ne = new_element("tc_combined", "button")
 
     ne.content = function ()
-        if state.tc_ms then
-            return (mp.get_property_osd("playback-time/full"))
-        else
-            return (mp.get_property_osd("playback-time"))
+        local cur = state.tc_ms and mp.get_property_osd("playback-time/full")
+                                 or mp.get_property_osd("playback-time")
+        local total = mp.format_time(state.duration or 0,
+                      state.tc_ms and "%H:%M:%S.%T" or "%H:%M:%S")
+        if state.duration and state.duration > 0 then
+            return cur .. " / " .. total
         end
+        return cur
     end
     ne.eventresponder["mbtn_left_up"] = function ()
         state.tc_ms = not state.tc_ms
         request_init()
     end
-
-    -- tc_right (total/remaining time)
-    ne = new_element("tc_right", "button")
-
-    ne.visible = state.duration and state.duration > 0
-    ne.content = function ()
-        if state.rightTC_trem then
-            local minus = user_opts.unicodeminus and UNICODE_MINUS or "-"
-            local property = user_opts.remaining_playtime and "playtime-remaining"
-                                                           or "time-remaining"
-            if state.tc_ms then
-                return (minus..mp.get_property_osd(property .. "/full"))
-            else
-                return (minus..mp.get_property_osd(property))
-            end
-        end
-
-        return mp.format_time(state.duration or 0, state.tc_ms and "%H:%M:%S.%T" or "%H:%M:%S")
-    end
-    ne.eventresponder["mbtn_left_up"] =
-        function () state.rightTC_trem = not state.rightTC_trem end
 
     -- cache
     ne = new_element("cache", "button")
@@ -2744,7 +2719,8 @@ local function osc_init()
     bind_mouse_buttons("volume")
 
 
-    -- custom buttons
+    -- custom buttons (disabled for now)
+    --[[
     for i = 1, math.huge do
         local content = user_opts["custom_button_" .. i .. "_content"]
         if not content or content == "" then
@@ -2755,6 +2731,7 @@ local function osc_init()
         bind_mouse_buttons("custom_button_" .. i)
         last_custom_button = i
     end
+    --]]
 
 
     -- load layout
