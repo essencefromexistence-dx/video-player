@@ -1806,7 +1806,7 @@ if win32
     # Hence, these includes are needed.
     res_includes = [source_root, build_root]
 
-    resources = ['etc/mpv-icon.ico',
+    resources = ['etc/dx-icon.ico',
                  'osdep/mpv.exe.manifest']
 
     sources += windows.compile_resources('osdep/mpv.rc', args: res_flags, depend_files: resources,

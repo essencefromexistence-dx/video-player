@@ -44,6 +44,6 @@ VS_VERSION_INFO VERSIONINFO
         }
     }
 
-IDI_ICON1 ICON "etc/mpv-icon.ico"
+IDI_ICON1 ICON "etc/dx-icon.ico"
 
 1 24 "mpv.exe.manifest"
