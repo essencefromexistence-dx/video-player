@@ -1993,7 +1993,7 @@ local function bar_layout(direction, slim)
         lo.geometry = geo
         lo.style = string.format("%s{\\clip(%f,%f,%f,%f)}",
             osc_styles.vidtitleBar,
-            geo.x, geo.y-geo.h, geo.w, geo.y+geo.h)
+            geo.x, geo.y-geo.h, geo.x + geo.w, geo.y+geo.h)
 
         -- Title row
         lo = add_layout("cache")
@@ -2051,7 +2051,7 @@ local function bar_layout(direction, slim)
 
     -- RIGHT GROUP (right to left, zero gaps)
     local ctrl_xR = osc_geo.x + osc_geo.w - padX - padwc_r
-    local rg = 0  -- no gap between right items
+    local rg = 4  -- small gap between right items
 
     -- Custom buttons (disabled for now)
     --[[
@@ -2155,7 +2155,7 @@ local function bar_layout(direction, slim)
         lo.geometry = geo
         lo.style = string.format("%s{\\clip(%f,%f,%f,%f)}",
             osc_styles.vidtitleBar,
-            geo.x, geo.y-geo.h, geo.w, geo.y+geo.h)
+            geo.x, geo.y-geo.h, geo.x + geo.w, geo.y+geo.h)
     end
 
 end
@@ -2680,10 +2680,13 @@ local function osc_init()
         end
         return cur
     end
+    -- clicking timecode disabled (prevents toggling ms display)
+    --[[
     ne.eventresponder["mbtn_left_up"] = function ()
         state.tc_ms = not state.tc_ms
         request_init()
     end
+    --]]
 
     -- cache
     ne = new_element("cache", "button")
