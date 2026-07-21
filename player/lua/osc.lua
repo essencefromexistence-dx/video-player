@@ -2077,13 +2077,13 @@ local function bar_layout(direction, slim)
     lo.hitbox = { x2 = math.huge }
     ctrl_xR = ctrl_xR - geo.w - rg
 
-    -- Volume (explicit hitbox covering icon + right edge)
-    geo = { x = ctrl_xR, y = ctrl_row, an = 6, w = buttonW, h = ctrl_h }
+    -- Volume (an=4 with 4px right padding so icon sits centered in slot)
+    geo = { x = ctrl_xR - buttonW + 4, y = ctrl_row, an = 4, w = buttonW, h = ctrl_h }
     lo = add_layout("volume")
     lo.geometry = geo
     lo.style = osc_styles.smallButtonsBar
-    lo.hitbox = { x1 = ctrl_xR - buttonW, x2 = ctrl_xR,
-                  y1 = ctrl_row - ctrl_h / 2, y2 = ctrl_row + ctrl_h / 2 }
+    lo.hitbox = { x1 = ctrl_xR - buttonW, y1 = ctrl_row - ctrl_h / 2,
+                  x2 = ctrl_xR, y2 = ctrl_row + ctrl_h / 2 }
     ctrl_xR = ctrl_xR - geo.w - rg
 
     -- Combined timecode (current / total) — right after volume
