@@ -299,6 +299,22 @@ local function set_osc_styles()
 end
 
 -- internal states, do not touch
+local lg_hide_timer = nil
+
+local function lg_show()
+    mp.set_property("liquid-glass", "yes")
+    if lg_hide_timer then lg_hide_timer:kill() end
+    lg_hide_timer = mp.add_timeout(0.5, function()
+        mp.set_property("liquid-glass", "no")
+        lg_hide_timer = nil
+    end)
+end
+
+local function lg_hide_now()
+    mp.set_property("liquid-glass", "no")
+    if lg_hide_timer then lg_hide_timer:kill(); lg_hide_timer = nil end
+end
+
 local state = {
     showtime = nil,                         -- time of last invocation (last mouse move)
     wc_showtime = nil,                      -- time of last invocation for window controls
@@ -2139,22 +2155,6 @@ local function bar_layout(direction, slim)
             geo.x, geo.y-geo.h, geo.x + geo.w, geo.y+geo.h)
     end
 
-    --==========================================================================
-    -- CENTER OVERLAY: play/pause, prev, next (aligned with liquid glass circles)
-    -- Always visible, independent of OSC auto-hide
-    --==========================================================================
-    local cx = osc_param.playresx / 2
-    local cy = osc_param.playresy / 2
-    local big_icon_size = osc_param.playresy * 0.10
-    local btn_style = osc_styles.bigButtons
-
-    -- Center play/pause visibility controlled by OSC visibility (via osc_visible/liquid-glass)
-    elements["play_pause"].eventresponder = {}
-
-    -- Play/pause overlay icon (center circle)
-    lo = add_layout("play_pause")
-    lo.geometry = { x = cx, y = cy, an = 5, w = big_icon_size, h = big_icon_size }
-    lo.style = btn_style
 end
 
 layouts["bottombar"] = function()
@@ -2758,7 +2758,6 @@ end
 
 local function osc_visible(visible)
     set_bar_visible("osc_visible", visible)
-    mp.set_property("liquid-glass", visible and "yes" or "no")
     if not visible then
         disable_thumbnail()
     end
@@ -2887,6 +2886,7 @@ local function process_mouse_move(refresh)
             show_osc()
             if window_controls_enabled() then show_wc() end
         end
+        lg_show()
     end
     state.last_mouseX, state.last_mouseY = mouseX, mouseY
 end
@@ -3551,6 +3551,12 @@ visibility_mode(user_opts.visibility, true)
 set_virt_mouse_area(0, 0, 0, 0, "input")
 set_virt_mouse_area(0, 0, 0, 0, "window-controls")
 set_virt_mouse_area(0, 0, 0, 0, "window-controls-title")
+
+-- Show liquid glass and OSC on any mouse move (bypasses showhide group)
+mp.add_forced_key_binding("mouse_move", "lg-mouse", function()
+    lg_show()
+    show_osc()
+end)
 
 -- Direct mouse click handler (bypasses OSC event system)
 mp.add_forced_key_binding("mbtn_left", "video-click", function()

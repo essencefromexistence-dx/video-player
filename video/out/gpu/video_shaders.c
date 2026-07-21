@@ -1177,7 +1177,19 @@ void pass_draw_liquid_glass(struct gl_shader_cache *sc,
     GLSLH(float mul = glow_val * gw * edge_factor + 1.0 + gb;)
     GLSLH(outcol = refrcol * vec4(vec3(mul), 1.0);)
 
-    // Icons removed — only center glass effect
+    // Center play/pause icon
+    GLSLHF("if (icon == 1) {\n");
+    GLSLHF("vec2 ip = rel_sq / radius;\n");
+    GLSLHF("if (u_paused > 0.5) {\n"); // paused → show play ▶
+    GLSLHF("float tri = lg_tri(ip, vec2(0.45,0.0), vec2(-0.25,0.35), vec2(-0.25,-0.35));\n");
+    GLSLHF("if (tri > -0.05) { outcol.rgb = vec3(1.0); }\n");
+    GLSLHF("} else {\n"); // playing → show pause ❚❚ (centered)
+    GLSLHF("float bar1 = max(abs(ip.x + 0.15) - 0.08, abs(ip.y) - 0.35);\n");
+    GLSLHF("float bar2 = max(abs(ip.x - 0.15) - 0.08, abs(ip.y) - 0.35);\n");
+    GLSLHF("if (bar1 < 0.05) { outcol.rgb = vec3(1.0); }\n");
+    GLSLHF("if (bar2 < 0.05) { outcol.rgb = vec3(1.0); }\n");
+    GLSLHF("}\n");
+    GLSLHF("}\n");
 
     GLSLH(return true;)
     GLSLHF("}\n"); // close lg_element
@@ -1186,7 +1198,7 @@ void pass_draw_liquid_glass(struct gl_shader_cache *sc,
     GLSL(float cr = 0.12;)
     GLSL(vec2 cp = vec2(0.0, 0.0);)
 
-    GLSLF("lg_element(p, cp, cr, 0, u_powerFactor, u_a, u_b, u_c, u_d, u_fPower, u_blurRadius, u_blurIters, u_noise, u_glowWeight, u_glowBias, u_glowEdge0, u_glowEdge1, color);\n");
+    GLSLF("lg_element(p, cp, cr, 1, u_powerFactor, u_a, u_b, u_c, u_d, u_fPower, u_blurRadius, u_blurIters, u_noise, u_glowWeight, u_glowBias, u_glowEdge0, u_glowEdge1, color);\n");
 
     GLSLF("}\n"); // end block
 }
