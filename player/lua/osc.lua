@@ -995,7 +995,7 @@ local function render_elements(master_ass)
 
         if element.is_wc then
             if not state.wc_visible then return end
-        else
+        elseif not element.always_visible then
             if not state.osc_visible then return end
         end
 
@@ -2126,26 +2126,7 @@ local function bar_layout(direction, slim)
     lo.style = osc_styles.smallButtonsBar
     ctrl_xL = ctrl_xL + geo.w + padX
 
-    -- Play/Pause
-    geo = { x = ctrl_xL, y = ctrl_row, an = 4, w = buttonW, h = ctrl_h }
-    lo = add_layout("play_pause")
-    lo.geometry = geo
-    lo.style = osc_styles.smallButtonsBar
-    ctrl_xL = ctrl_xL + geo.w + padX
-
-    -- Chapter prev
-    geo = { x = ctrl_xL, y = ctrl_row, an = 4, w = buttonW, h = ctrl_h }
-    lo = add_layout("chapter_prev")
-    lo.geometry = geo
-    lo.style = osc_styles.smallButtonsBar
-    ctrl_xL = ctrl_xL + geo.w + padX
-
-    -- Chapter next
-    geo = { x = ctrl_xL, y = ctrl_row, an = 4, w = buttonW, h = ctrl_h }
-    lo = add_layout("chapter_next")
-    lo.geometry = geo
-    lo.style = osc_styles.smallButtonsBar
-    ctrl_xL = ctrl_xL + geo.w + padX
+    -- Play/Pause, Chapter prev/next moved to center overlay (below)
 
     -- Title (fills remaining space)
     local title_w = math.max(0, ctrl_xR - ctrl_xL)
@@ -2158,6 +2139,46 @@ local function bar_layout(direction, slim)
             geo.x, geo.y-geo.h, geo.x + geo.w, geo.y+geo.h)
     end
 
+    --==========================================================================
+    -- CENTER OVERLAY: play/pause, prev, next (aligned with liquid glass circles)
+    -- Always visible, independent of OSC auto-hide
+    --==========================================================================
+    local cx = osc_param.playresx / 2
+    local cy = osc_param.playresy / 2
+    local gap = osc_param.playresx * 0.14  -- gap between center and side buttons
+    local icon_size = osc_param.playresy * 0.07
+    local big_icon_size = osc_param.playresy * 0.10
+    local btn_style = osc_styles.bigButtons
+
+    elements["play_pause"].always_visible = true
+    elements["chapter_prev"].always_visible = true
+    elements["chapter_next"].always_visible = true
+
+    -- Disable event handling for center overlay — process_event handles clicks
+    elements["play_pause"].eventresponder = {}
+    elements["chapter_prev"].eventresponder = {}
+    elements["chapter_next"].eventresponder = {}
+
+    -- Prev (left circle)
+    lo = add_layout("chapter_prev")
+    lo.geometry = { x = cx - gap, y = cy, an = 5, w = icon_size, h = icon_size }
+    lo.style = btn_style
+    lo.hitbox = { x1 = cx - gap - icon_size / 2, y1 = cy - icon_size / 2,
+                  x2 = cx - gap + icon_size / 2, y2 = cy + icon_size / 2 }
+
+    -- Play/pause (center circle)
+    lo = add_layout("play_pause")
+    lo.geometry = { x = cx, y = cy, an = 5, w = big_icon_size, h = big_icon_size }
+    lo.style = btn_style
+    lo.hitbox = { x1 = cx - big_icon_size / 2, y1 = cy - big_icon_size / 2,
+                  x2 = cx + big_icon_size / 2, y2 = cy + big_icon_size / 2 }
+
+    -- Next (right circle)
+    lo = add_layout("chapter_next")
+    lo.geometry = { x = cx + gap, y = cy, an = 5, w = icon_size, h = icon_size }
+    lo.style = btn_style
+    lo.hitbox = { x1 = cx + gap - icon_size / 2, y1 = cy - icon_size / 2,
+                  x2 = cx + gap + icon_size / 2, y2 = cy + icon_size / 2 }
 end
 
 layouts["bottombar"] = function()
@@ -3122,8 +3143,12 @@ local function render()
     -- actual rendering
     local ass = assdraw.ass_new()
 
-    -- actual OSC
-    if state.osc_visible or state.wc_visible then
+    -- actual OSC (always render if any element has always_visible, e.g. center overlay)
+    local has_always_visible = false
+    for _, e in pairs(elements) do
+        if e.always_visible then has_always_visible = true; break end
+    end
+    if state.osc_visible or state.wc_visible or has_always_visible then
         render_elements(ass)
     end
 
@@ -3540,3 +3565,22 @@ visibility_mode(user_opts.visibility, true)
 set_virt_mouse_area(0, 0, 0, 0, "input")
 set_virt_mouse_area(0, 0, 0, 0, "window-controls")
 set_virt_mouse_area(0, 0, 0, 0, "window-controls-title")
+
+-- Direct mouse click handler (bypasses OSC event system)
+mp.add_forced_key_binding("mbtn_left", "video-click", function()
+    local mx = mp.get_property_number("mouse-pos/x")
+    local my = mp.get_property_number("mouse-pos/y")
+    local bw = mp.get_property_number("osd-width")
+    local bh = mp.get_property_number("osd-height")
+    -- Click above bottom bar area
+    if my and bw and bh and my < bh - 56 then
+        local third = (bw or 1) / 3
+        if mx < third then
+            mp.command("playlist-prev")
+        elseif mx > third * 2 then
+            mp.command("playlist-next")
+        else
+            mp.command("cycle pause")
+        end
+    end
+end)

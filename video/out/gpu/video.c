@@ -186,6 +186,7 @@ struct gl_video {
 
     bool dumb_mode;
     bool forced_dumb_mode;
+    bool paused;
 
     // Cached vertex array, to avoid re-allocation per frame. For simplicity,
     // our vertex format is simply a list of `vertex_pt`s, since this greatly
@@ -2107,7 +2108,7 @@ static void liquid_glass_hook(struct gl_video *p, struct image img,
                               struct gl_transform *trans, void *priv)
 {
     pass_describe(p, "liquid glass overlay");
-    pass_draw_liquid_glass(p->sc, &p->opts.liquid_glass);
+    pass_draw_liquid_glass(p->sc, &p->opts.liquid_glass, p->paused);
 }
 
 struct szexp_ctx {
@@ -3587,6 +3588,8 @@ void gl_video_render_frame(struct gl_video *p, struct vo_frame *frame,
                            const struct ra_fbo *fbo, int flags)
 {
     gl_video_update_options(p);
+
+    p->paused = frame->still;
 
     struct mp_rect target_rc = {0, 0, fbo->tex->params.w, fbo->tex->params.h};
 

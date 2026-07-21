@@ -59,6 +59,7 @@ void pass_sample_deband(struct gl_shader_cache *sc, struct deband_opts *opts,
 void pass_sample_unsharp(struct gl_shader_cache *sc, float param);
 
 void pass_draw_liquid_glass(struct gl_shader_cache *sc,
-                            const struct gl_liquid_glass_opts *opts);
+                            const struct gl_liquid_glass_opts *opts,
+                            bool paused);
 
 #endif

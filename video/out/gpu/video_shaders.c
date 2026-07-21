@@ -1039,7 +1039,8 @@ void pass_sample_unsharp(struct gl_shader_cache *sc, float param) {
 }
 
 void pass_draw_liquid_glass(struct gl_shader_cache *sc,
-                            const struct gl_liquid_glass_opts *opts)
+                            const struct gl_liquid_glass_opts *opts,
+                            bool paused)
 {
     if (!opts->enabled)
         return;
@@ -1130,6 +1131,8 @@ void pass_draw_liquid_glass(struct gl_shader_cache *sc,
     GLSLHF("return min(min(c0, c1), c2);\n");
     GLSLHF("}\n");
 
+    GLSLHF("float u_paused = %d;\n", paused ? 1 : 0);
+
     // ─── Per-element helper: renders one glass button ───────────────
     GLSLHF("bool lg_element(vec2 p, vec2 center, float radius, int icon,\n");
     GLSLHF("  float pf, float ua, float ub, float uc, float ud,\n");
@@ -1171,23 +1174,6 @@ void pass_draw_liquid_glass(struct gl_shader_cache *sc,
     GLSLH(float edge_factor = smoothstep(ge0, ge1, dist);)
     GLSLH(float mul = glow_val * gw * edge_factor + 1.0 + gb;)
     GLSLH(outcol = refrcol * vec4(vec3(mul), 1.0);)
-
-    // Draw icon (white via mix)
-    GLSLHF("if (icon == 1) {\n"); // play ▶
-    GLSLHF("vec2 ip = rel_sq / radius;\n");
-    GLSLHF("float tri = lg_tri(ip, vec2(0.45,0.0), vec2(-0.25,0.35), vec2(-0.25,-0.35));\n");
-    GLSLHF("if (tri > -0.05) { outcol.rgb = mix(outcol.rgb, vec3(1.0), 0.85); }\n");
-    GLSLHF("} else if (icon == 2) {\n"); // next >>
-    GLSLHF("vec2 ip2 = rel_sq / radius;\n");
-    GLSLHF("float t1 = lg_tri(ip2, vec2(0.3,0.0), vec2(-0.15,0.35), vec2(-0.15,-0.35));\n");
-    GLSLHF("float t2 = lg_tri(ip2, vec2(0.55,0.0), vec2(0.1,0.35), vec2(0.1,-0.35));\n");
-    GLSLHF("if (max(t1, t2) > -0.05) { outcol.rgb = mix(outcol.rgb, vec3(1.0), 0.85); }\n");
-    GLSLHF("} else if (icon == 3) {\n"); // prev <<
-    GLSLHF("vec2 ip3 = rel_sq / radius;\n");
-    GLSLHF("float t1p = lg_tri(ip3, vec2(-0.3,0.0), vec2(0.15,-0.35), vec2(0.15,0.35));\n");
-    GLSLHF("float t2p = lg_tri(ip3, vec2(-0.55,0.0), vec2(-0.1,-0.35), vec2(-0.1,0.35));\n");
-    GLSLHF("if (max(t1p, t2p) > -0.05) { outcol.rgb = mix(outcol.rgb, vec3(1.0), 0.85); }\n");
-    GLSLHF("}\n");
 
     GLSLH(return true;)
     GLSLHF("}\n");
