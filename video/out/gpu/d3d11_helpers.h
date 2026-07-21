@@ -27,9 +27,8 @@
 
 #include "video/mp_image.h"
 
-#if !HAVE_DXGI_DEBUG_D3D11
-DEFINE_GUID(DXGI_DEBUG_D3D11, 0x4b99317b, 0xac39, 0x4aa6, 0xbb, 0xb, 0xba, 0xa0, 0x47, 0x84, 0x79, 0x8f);
-#endif
+// DXGI_DEBUG_D3D11 is provided by d3d11sdklayers.h (Mingw 16.x+)
+// No need for a fallback DEFINE_GUID here.
 
 struct d3d11_device_opts {
     // Enable the debug layer (D3D11_CREATE_DEVICE_DEBUG)

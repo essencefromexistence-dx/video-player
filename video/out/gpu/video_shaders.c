@@ -1038,25 +1038,6 @@ void pass_sample_unsharp(struct gl_shader_cache *sc, float param) {
     GLSLF("}\n");
 }
 
-const struct gl_liquid_glass_opts gl_liquid_glass_opts_def = {
-    .enabled = false,
-    .power_factor = 2.049f,
-    .width = 3.5f,
-    .height = 3.5f,
-    .blur_radius = 2.0f,
-    .blur_iters = 0,
-    .noise = 0.06f,
-    .fpower = 1.0f,
-    .a = 0.7f,
-    .b = 2.3f,
-    .c = 5.2f,
-    .d = 6.9f,
-    .glow_weight = 0.266f,
-    .glow_bias = 0.0f,
-    .glow_edge0 = 0.5f,
-    .glow_edge1 = -0.5f,
-};
-
 void pass_draw_liquid_glass(struct gl_shader_cache *sc,
                             const struct gl_liquid_glass_opts *opts)
 {
@@ -1088,8 +1069,6 @@ void pass_draw_liquid_glass(struct gl_shader_cache *sc,
 
     // Set uniforms
     GLSLF("float u_powerFactor = %f;\n", opts->power_factor);
-    GLSLF("float u_width = %f;\n", opts->width);
-    GLSLF("float u_height = %f;\n", opts->height);
     GLSLF("float u_blurRadius = %f;\n", opts->blur_radius);
     GLSLF("int u_blurIters = %d;\n", opts->blur_iters);
     GLSLF("float u_noise = %f;\n", opts->noise);
@@ -1103,91 +1082,127 @@ void pass_draw_liquid_glass(struct gl_shader_cache *sc,
     GLSLF("float u_glowEdge0 = %f;\n", opts->glow_edge0);
     GLSLF("float u_glowEdge1 = %f;\n", opts->glow_edge1);
 
-    // Save original video pixel and sample at center
+    // Save original video pixel
     GLSL(vec4 video_pixel = HOOKED_tex(HOOKED_pos);)
     GLSL(color = video_pixel;)
 
-    // Main shader body
-    GLSL(vec2 raw_pos = HOOKED_pos;)
+    // NDC position
+    GLSL(vec2 p = HOOKED_pos * 2.0 - 1.0;)
 
-    // Compute centered NDC position, aspect-corrected
-    GLSL(vec2 p = raw_pos * 2.0 - 1.0;)
-    GLSL(float aspect = HOOKED_size.y / HOOKED_size.x;)
-    GLSL(p.x *= aspect;)
+    // ─── Blur helpers (applied inline inside each element) ──────────
+    GLSLHF("vec4 lg_blurH(vec2 uv, vec2 pt, float radius) {\n");
+    GLSLHF("float r = radius;\n");
+    GLSLHF("vec4 c = vec4(0.0);\n");
+    GLSLHF("vec2 o1 = vec2(1.411764705882353, 0.0) * pt * r;\n");
+    GLSLHF("vec2 o2 = vec2(3.2941176470588234, 0.0) * pt * r;\n");
+    GLSLHF("vec2 o3 = vec2(5.176470588235294, 0.0) * pt * r;\n");
+    GLSLHF("c += texture(HOOKED_raw, uv) * 0.1964825501511404;\n");
+    GLSLHF("c += texture(HOOKED_raw, uv + o1) * 0.2969069646728344;\n");
+    GLSLHF("c += texture(HOOKED_raw, uv - o1) * 0.2969069646728344;\n");
+    GLSLHF("c += texture(HOOKED_raw, uv + o2) * 0.09447039785044732;\n");
+    GLSLHF("c += texture(HOOKED_raw, uv - o2) * 0.09447039785044732;\n");
+    GLSLHF("c += texture(HOOKED_raw, uv + o3) * 0.010381362401148057;\n");
+    GLSLHF("c += texture(HOOKED_raw, uv - o3) * 0.010381362401148057;\n");
+    GLSLHF("return c;\n");
+    GLSLHF("}\n");
+    GLSLHF("vec4 lg_blurV(vec4 hcol, vec2 uv, vec2 pt, float radius) {\n");
+    GLSLHF("float r = radius;\n");
+    GLSLHF("vec4 c = hcol * 0.1964825501511404;\n");
+    GLSLHF("vec2 o1 = vec2(0.0, 1.411764705882353) * pt * r;\n");
+    GLSLHF("vec2 o2 = vec2(0.0, 3.2941176470588234) * pt * r;\n");
+    GLSLHF("vec2 o3 = vec2(0.0, 5.176470588235294) * pt * r;\n");
+    GLSLHF("c += texture(HOOKED_raw, uv + o1) * 0.2969069646728344;\n");
+    GLSLHF("c += texture(HOOKED_raw, uv - o1) * 0.2969069646728344;\n");
+    GLSLHF("c += texture(HOOKED_raw, uv + o2) * 0.09447039785044732;\n");
+    GLSLHF("c += texture(HOOKED_raw, uv - o2) * 0.09447039785044732;\n");
+    GLSLHF("c += texture(HOOKED_raw, uv + o3) * 0.010381362401148057;\n");
+    GLSLHF("c += texture(HOOKED_raw, uv - o3) * 0.010381362401148057;\n");
+    GLSLHF("return c;\n");
+    GLSLHF("}\n");
 
-    // Glass element size in NDC
-    GLSL(vec2 glassSize = vec2(u_width, u_height) * 0.1;)
-    GLSL(glassSize.x *= aspect;)
-    GLSL(vec2 localP = p / glassSize;)
-    GLSL(float d = lg_sdSuperellipse(localP, u_powerFactor, 1.0);)
+    // ─── Icon SDF helpers ───────────────────────────────────────────
+    GLSLHF("float lg_tri(vec2 p, vec2 v0, vec2 v1, vec2 v2) {\n");
+    GLSLHF("vec2 e0 = v1 - v0, e1 = v2 - v1, e2 = v0 - v2;\n");
+    GLSLHF("vec2 r0 = p - v0, r1 = p - v1, r2 = p - v2;\n");
+    GLSLHF("float c0 = e0.x * r0.y - e0.y * r0.x;\n");
+    GLSLHF("float c1 = e1.x * r1.y - e1.y * r1.x;\n");
+    GLSLHF("float c2 = e2.x * r2.y - e2.y * r2.x;\n");
+    GLSLHF("return min(min(c0, c1), c2);\n");
+    GLSLHF("}\n");
 
-    // Outside the squircle -> keep original video
-    GLSLF("if (d > 0.0) { }\n");
-    GLSLF("else {\n");
+    // ─── Per-element helper: renders one glass button ───────────────
+    GLSLHF("bool lg_element(vec2 p, vec2 center, float radius, int icon,\n");
+    GLSLHF("  float pf, float ua, float ub, float uc, float ud,\n");
+    GLSLHF("  float fp, float br, int bi, float ns,\n");
+    GLSLHF("  float gw, float gb, float ge0, float ge1,\n");
+    GLSLHF("  inout vec4 outcol) {\n");
+    GLSLH(vec2 rel = p - center;)
+    GLSLH(vec2 rel_sq = rel;)
+    GLSLH(rel_sq.x *= HOOKED_size.x / HOOKED_size.y;)
+    GLSLH(vec2 lp = rel_sq / radius;)
+    GLSLH(float d = lg_sdSuperellipse(lp, pf, 1.0);)
+    GLSLHF("if (d > 0.0) return false;\n");
+    GLSLH(float dist = -d;)
+    GLSLH(float fv = 1.0 - ub * pow(uc * LG_M_E, -ud * dist - ua);)
+    GLSLH(float refr = pow(fv, fp);)
+    GLSLH(vec2 sl = lp * refr;)
+    GLSLH(vec2 sndc = sl * radius;)
+    GLSLH(sndc.x /= HOOKED_size.x / HOOKED_size.y;)
+    GLSLH(sndc += center;)
+    GLSLH(vec2 suv = sndc * 0.5 + 0.5;)
+    GLSLHF("if (max(suv.x, suv.y) > 1.0 || min(suv.x, suv.y) < 0.0) return false;\n");
 
-    // Inside: apply refraction, noise, glow
-    GLSL(float dist = -d;)
+    // Sample with blur (two-pass separable, inline)
+    GLSLH(vec4 refrcol;)
+    GLSLHF("if (bi > 0) {\n");
+    GLSLH(vec2 pt = HOOKED_pt;)
+    GLSLH(vec4 blurH = lg_blurH(suv, pt, br);)
+    GLSLH(refrcol = lg_blurV(blurH, suv, pt, br);)
+    GLSLHF("} else {\n");
+    GLSLH(refrcol = texture(HOOKED_raw, suv);)
+    GLSLHF("}\n");
 
-    // Refraction displacement
-    GLSL(float f_val = lg_f(dist, u_a, u_b, u_c, u_d);)
-    GLSL(float refr = pow(f_val, u_fPower);)
-    GLSL(vec2 sampleLocal = localP * refr;)
-    GLSL(vec2 sampleNDC = sampleLocal * glassSize;)
-    GLSL(sampleNDC.x /= aspect;)
-    GLSL(vec2 sampleUV = sampleNDC * 0.5 + 0.5;)
+    // Noise (reference: added after sampling)
+    GLSLH(refrcol.rgb += (lg_rand(gl_FragCoord.xy) - 0.5) * ns;)
 
-    // Sample the frame at the refracted position
-    GLSL(vec4 refracted = texture(HOOKED_raw, sampleUV);)
+    // Glow (reference: smoothstep(ge0, ge1, dist) directly)
+    GLSLH(float phi = atan(lp.y, lp.x);)
+    GLSLH(float glow_val = sin(phi - 0.5);)
+    GLSLH(float edge_factor = smoothstep(ge0, ge1, dist);)
+    GLSLH(float mul = glow_val * gw * edge_factor + 1.0 + gb;)
+    GLSLH(outcol = refrcol * vec4(vec3(mul), 1.0);)
 
-    // Apply simple blur if blur_iters > 0
-    GLSLF("if (u_blurIters > 0) {\n");
-    GLSL(vec2 blurDir = vec2(1.0, 0.0);)
-    GLSL(vec2 off1 = vec2(1.411764705882353) * u_blurRadius * blurDir * HOOKED_pt;)
-    GLSL(vec2 off2 = vec2(3.2941176470588234) * u_blurRadius * blurDir * HOOKED_pt;)
-    GLSL(vec2 off3 = vec2(5.176470588235294) * u_blurRadius * blurDir * HOOKED_pt;)
-    GLSL(vec4 blurH = refracted * 0.1964825501511404;)
-    GLSL(blurH += texture(HOOKED_raw, sampleUV + off1) * 0.2969069646728344;)
-    GLSL(blurH += texture(HOOKED_raw, sampleUV - off1) * 0.2969069646728344;)
-    GLSL(blurH += texture(HOOKED_raw, sampleUV + off2) * 0.09447039785044732;)
-    GLSL(blurH += texture(HOOKED_raw, sampleUV - off2) * 0.09447039785044732;)
-    GLSL(blurH += texture(HOOKED_raw, sampleUV + off3) * 0.010381362401148057;)
-    GLSL(blurH += texture(HOOKED_raw, sampleUV - off3) * 0.010381362401148057;)
-    GLSL(vec2 blurDirV = vec2(0.0, 1.0);)
-    GLSL(vec2 voff1 = vec2(1.411764705882353) * u_blurRadius * blurDirV * HOOKED_pt;)
-    GLSL(vec2 voff2 = vec2(3.2941176470588234) * u_blurRadius * blurDirV * HOOKED_pt;)
-    GLSL(vec2 voff3 = vec2(5.176470588235294) * u_blurRadius * blurDirV * HOOKED_pt;)
-    GLSL(vec4 blurV = blurH * 0.1964825501511404;)
-    GLSL(blurV += texture(HOOKED_raw, sampleUV + voff1) * 0.2969069646728344;)
-    GLSL(blurV += texture(HOOKED_raw, sampleUV - voff1) * 0.2969069646728344;)
-    GLSL(blurV += texture(HOOKED_raw, sampleUV + voff2) * 0.09447039785044732;)
-    GLSL(blurV += texture(HOOKED_raw, sampleUV - voff2) * 0.09447039785044732;)
-    GLSL(blurV += texture(HOOKED_raw, sampleUV + voff3) * 0.010381362401148057;)
-    GLSL(blurV += texture(HOOKED_raw, sampleUV - voff3) * 0.010381362401148057;)
-    GLSL(refracted = blurV;)
+    // Draw icon (white via mix)
+    GLSLHF("if (icon == 1) {\n"); // play ▶
+    GLSLHF("vec2 ip = rel_sq / radius;\n");
+    GLSLHF("float tri = lg_tri(ip, vec2(0.45,0.0), vec2(-0.25,0.35), vec2(-0.25,-0.35));\n");
+    GLSLHF("if (tri > -0.05) { outcol.rgb = mix(outcol.rgb, vec3(1.0), 0.85); }\n");
+    GLSLHF("} else if (icon == 2) {\n"); // next >>
+    GLSLHF("vec2 ip2 = rel_sq / radius;\n");
+    GLSLHF("float t1 = lg_tri(ip2, vec2(0.3,0.0), vec2(-0.15,0.35), vec2(-0.15,-0.35));\n");
+    GLSLHF("float t2 = lg_tri(ip2, vec2(0.55,0.0), vec2(0.1,0.35), vec2(0.1,-0.35));\n");
+    GLSLHF("if (max(t1, t2) > -0.05) { outcol.rgb = mix(outcol.rgb, vec3(1.0), 0.85); }\n");
+    GLSLHF("} else if (icon == 3) {\n"); // prev <<
+    GLSLHF("vec2 ip3 = rel_sq / radius;\n");
+    GLSLHF("float t1p = lg_tri(ip3, vec2(-0.3,0.0), vec2(0.15,-0.35), vec2(0.15,0.35));\n");
+    GLSLHF("float t2p = lg_tri(ip3, vec2(-0.55,0.0), vec2(-0.1,-0.35), vec2(-0.1,0.35));\n");
+    GLSLHF("if (max(t1p, t2p) > -0.05) { outcol.rgb = mix(outcol.rgb, vec3(1.0), 0.85); }\n");
+    GLSLHF("}\n");
+
+    GLSLH(return true;)
+    GLSLHF("}\n");
+
+    // Three glass buttons: prev (left), play (center), next (right)
+    GLSL(float cr = 0.12; float sr = 0.08;)
+    GLSL(vec2 cp = vec2(0.0, 0.0);)
+    GLSL(vec2 lp = vec2(-0.22, 0.0);)
+    GLSL(vec2 rp = vec2(0.22, 0.0);)
+
+    GLSLF("if (!lg_element(p, lp, sr, 3, u_powerFactor, u_a, u_b, u_c, u_d, u_fPower, u_blurRadius, u_blurIters, u_noise, u_glowWeight, u_glowBias, u_glowEdge0, u_glowEdge1, color)) {\n");
+    GLSLF("  if (!lg_element(p, rp, sr, 2, u_powerFactor, u_a, u_b, u_c, u_d, u_fPower, u_blurRadius, u_blurIters, u_noise, u_glowWeight, u_glowBias, u_glowEdge0, u_glowEdge1, color)) {\n");
+    GLSLF("    lg_element(p, cp, cr, 1, u_powerFactor, u_a, u_b, u_c, u_d, u_fPower, u_blurRadius, u_blurIters, u_noise, u_glowWeight, u_glowBias, u_glowEdge0, u_glowEdge1, color);\n");
+    GLSLF("  }\n");
     GLSLF("}\n");
 
-    // Out of bounds check: use original color if refracted UV is outside frame
-    GLSLF("if (max(sampleUV.x, sampleUV.y) > 1.0 || min(sampleUV.x, sampleUV.y) < 0.0) {\n");
-    GLSLF("} else {\n");
-
-    // Noise
-    GLSL(float noise_val = (lg_rand(gl_FragCoord.xy) - 0.5) * u_noise;)
-    GLSL(refracted.rgb += noise_val;)
-
-    // Glow - edge glow based on angle and distance
-    GLSL(float phi = atan(localP.y, localP.x);)
-    GLSL(float glow_val = sin(phi - 0.5);)
-    GLSLF("float e0 = %f, e1 = %f;\n", opts->glow_edge0, opts->glow_edge1);
-    GLSLF("float edge_factor;\n");
-    GLSLF("if (e0 < e1) {\n");
-    GLSL(edge_factor = smoothstep(e0, e1, dist);)
-    GLSLF("} else {\n");
-    GLSL(edge_factor = 1.0 - smoothstep(e1, e0, dist);)
-    GLSLF("}\n");
-    GLSL(float mul = glow_val * u_glowWeight * edge_factor + 1.0 + u_glowBias;)
-    GLSL(color = refracted * vec4(vec3(mul), 1.0);)
-
-    GLSLF("}\n"); // end out-of-bounds else
-    GLSLF("}\n"); // end d > 0 else
     GLSLF("}\n"); // end block
 }

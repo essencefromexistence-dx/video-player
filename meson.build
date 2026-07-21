@@ -1417,7 +1417,7 @@ d3d_hwaccel = get_option('d3d-hwaccel').require(
     error_message: 'the os is not win32!',
 )
 features += {'d3d-hwaccel': d3d_hwaccel.allowed()}
-if features['d3d-hwaccel']
+if features['d3d-hwaccel'] and features['d3d11']
     sources += files('video/d3d.c',
                      'video/filter/vf_d3d11vpp.c')
 endif

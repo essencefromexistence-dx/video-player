@@ -24,8 +24,6 @@
 #include "utils.h"
 #include "video.h"
 
-extern const struct gl_liquid_glass_opts gl_liquid_glass_opts_def;
-
 struct deband_opts {
     int iterations;
     float threshold;

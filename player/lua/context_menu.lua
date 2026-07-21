@@ -267,7 +267,7 @@ local function append_item(ass, menu, level, style, item, item_y,
         ass:new_event()
         ass:an(4)
         ass:pos(menu.x, item_y)
-        ass:append("{\\blur0\\bord0\\4aH&ff&\\1c&H" ..
+        ass:append("{\\blur0\\bord0\\4a&Hff&\\1c&H" ..
                     color_option_to_ass(options.focused_back_color) .. "&}")
         ass:draw_start()
         ass:rect_cw(0, 0, menu.width, line_height)
@@ -416,11 +416,9 @@ local function render()
         back_color = "222222"
     end
 
-    local background_style = "{\\1c&H" .. back_color ..
-                       "&\\1a&H" .. string.format("%x", options.background_alpha) ..
-                       "&\\bord" .. options.menu_outline_size .. "\\3c&H" ..
-                       color_option_to_ass(options.menu_outline_color) ..
-                       "\\blur0&}"
+    local background_style = "{\\blur4\\bord0\\1c&H" .. back_color ..
+                       "&\\1a&H" .. string.format("%x", math.min(255, options.background_alpha + 140)) ..
+                       "&}"
     if border_style == "background-box" then
         background_style = background_style .. "{\\4a&Hff&}"
     end

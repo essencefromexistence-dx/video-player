@@ -44,7 +44,6 @@ VS_VERSION_INFO VERSIONINFO
         }
     }
 
-"IDI_ICON1" ICON DISCARDABLE  "etc/mpv-icon.ico"
+IDI_ICON1 ICON "etc/mpv-icon.ico"
 
-// for some reason RT_MANIFEST does not work
 1 24 "mpv.exe.manifest"
