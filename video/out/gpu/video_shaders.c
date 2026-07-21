@@ -1181,8 +1181,8 @@ void pass_draw_liquid_glass(struct gl_shader_cache *sc,
     // Three glass buttons: prev (left), play (center), next (right)
     GLSL(float cr = 0.12; float sr = 0.08;)
     GLSL(vec2 cp = vec2(0.0, 0.0);)
-    GLSL(vec2 lp = vec2(-0.22, 0.0);)
-    GLSL(vec2 rp = vec2(0.22, 0.0);)
+    GLSL(vec2 lp = vec2(-0.30, 0.0);)
+    GLSL(vec2 rp = vec2(0.30, 0.0);)
 
     GLSLF("if (!lg_element(p, lp, sr, 3, u_powerFactor, u_a, u_b, u_c, u_d, u_fPower, u_blurRadius, u_blurIters, u_noise, u_glowWeight, u_glowBias, u_glowEdge0, u_glowEdge1, color)) {\n");
     GLSLF("  if (!lg_element(p, rp, sr, 2, u_powerFactor, u_a, u_b, u_c, u_d, u_fPower, u_blurRadius, u_blurIters, u_noise, u_glowWeight, u_glowBias, u_glowEdge0, u_glowEdge1, color)) {\n");

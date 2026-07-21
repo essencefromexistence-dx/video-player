@@ -2145,7 +2145,7 @@ local function bar_layout(direction, slim)
     --==========================================================================
     local cx = osc_param.playresx / 2
     local cy = osc_param.playresy / 2
-    local gap = osc_param.playresx * 0.14  -- gap between center and side buttons
+    local gap = osc_param.playresx * 0.30  -- gap between center and side buttons
     local icon_size = osc_param.playresy * 0.07
     local big_icon_size = osc_param.playresy * 0.10
     local btn_style = osc_styles.bigButtons
@@ -3574,10 +3574,11 @@ mp.add_forced_key_binding("mbtn_left", "video-click", function()
     local bh = mp.get_property_number("osd-height")
     -- Click above bottom bar area
     if my and bw and bh and my < bh - 56 then
-        local third = (bw or 1) / 3
-        if mx < third then
+        local left_zone = bw * 0.25
+        local right_zone = bw * 0.75
+        if mx < left_zone then
             mp.command("playlist-prev")
-        elseif mx > third * 2 then
+        elseif mx > right_zone then
             mp.command("playlist-next")
         else
             mp.command("cycle pause")
