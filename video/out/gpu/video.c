@@ -409,6 +409,8 @@ static const struct gl_video_opts gl_video_opts_def = {
     },
     .liquid_glass = {
         .enabled = true,
+        .can_prev = true,
+        .can_next = true,
         .power_factor = 2.049f,
         .width = 3.5f,
         .height = 3.5f,
@@ -570,6 +572,8 @@ const struct m_sub_options gl_video_conf = {
         {"deband", OPT_SUBSTRUCT(deband_opts, deband_conf)},
         {"sharpen", OPT_FLOAT(unsharp)},
         {"liquid-glass", OPT_BOOL(liquid_glass.enabled)},
+        {"liquid-glass-can-prev", OPT_BOOL(liquid_glass.can_prev)},
+        {"liquid-glass-can-next", OPT_BOOL(liquid_glass.can_next)},
         {"liquid-glass-power", OPT_FLOAT(liquid_glass.power_factor), M_RANGE(1.001, 6.0)},
         {"liquid-glass-width", OPT_FLOAT(liquid_glass.width), M_RANGE(0.0, 10.0)},
         {"liquid-glass-height", OPT_FLOAT(liquid_glass.height), M_RANGE(0.0, 10.0)},
@@ -2108,7 +2112,9 @@ static void liquid_glass_hook(struct gl_video *p, struct image img,
                               struct gl_transform *trans, void *priv)
 {
     pass_describe(p, "liquid glass overlay");
-    pass_draw_liquid_glass(p->sc, &p->opts.liquid_glass, p->paused);
+    pass_draw_liquid_glass(p->sc, &p->opts.liquid_glass, p->paused,
+                           p->opts.liquid_glass.can_prev,
+                           p->opts.liquid_glass.can_next);
 }
 
 struct szexp_ctx {

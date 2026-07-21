@@ -2145,40 +2145,16 @@ local function bar_layout(direction, slim)
     --==========================================================================
     local cx = osc_param.playresx / 2
     local cy = osc_param.playresy / 2
-    local gap = osc_param.playresx * 0.30  -- gap between center and side buttons
-    local icon_size = osc_param.playresy * 0.07
     local big_icon_size = osc_param.playresy * 0.10
     local btn_style = osc_styles.bigButtons
 
-    elements["play_pause"].always_visible = true
-    elements["chapter_prev"].always_visible = true
-    elements["chapter_next"].always_visible = true
-
-    -- Disable event handling for center overlay — process_event handles clicks
+    -- Center play/pause visibility controlled by OSC visibility (via osc_visible/liquid-glass)
     elements["play_pause"].eventresponder = {}
-    elements["chapter_prev"].eventresponder = {}
-    elements["chapter_next"].eventresponder = {}
 
-    -- Prev (left circle)
-    lo = add_layout("chapter_prev")
-    lo.geometry = { x = cx - gap, y = cy, an = 5, w = icon_size, h = icon_size }
-    lo.style = btn_style
-    lo.hitbox = { x1 = cx - gap - icon_size / 2, y1 = cy - icon_size / 2,
-                  x2 = cx - gap + icon_size / 2, y2 = cy + icon_size / 2 }
-
-    -- Play/pause (center circle)
+    -- Play/pause overlay icon (center circle)
     lo = add_layout("play_pause")
     lo.geometry = { x = cx, y = cy, an = 5, w = big_icon_size, h = big_icon_size }
     lo.style = btn_style
-    lo.hitbox = { x1 = cx - big_icon_size / 2, y1 = cy - big_icon_size / 2,
-                  x2 = cx + big_icon_size / 2, y2 = cy + big_icon_size / 2 }
-
-    -- Next (right circle)
-    lo = add_layout("chapter_next")
-    lo.geometry = { x = cx + gap, y = cy, an = 5, w = icon_size, h = icon_size }
-    lo.style = btn_style
-    lo.hitbox = { x1 = cx + gap - icon_size / 2, y1 = cy - icon_size / 2,
-                  x2 = cx + gap + icon_size / 2, y2 = cy + icon_size / 2 }
 end
 
 layouts["bottombar"] = function()
@@ -2782,6 +2758,7 @@ end
 
 local function osc_visible(visible)
     set_bar_visible("osc_visible", visible)
+    mp.set_property("liquid-glass", visible and "yes" or "no")
     if not visible then
         disable_thumbnail()
     end
@@ -3143,12 +3120,8 @@ local function render()
     -- actual rendering
     local ass = assdraw.ass_new()
 
-    -- actual OSC (always render if any element has always_visible, e.g. center overlay)
-    local has_always_visible = false
-    for _, e in pairs(elements) do
-        if e.always_visible then has_always_visible = true; break end
-    end
-    if state.osc_visible or state.wc_visible or has_always_visible then
+    -- actual OSC
+    if state.osc_visible or state.wc_visible then
         render_elements(ass)
     end
 
@@ -3257,10 +3230,23 @@ local function set_tick_delay(_, display_fps)
 end
 
 mp.register_event("shutdown", shutdown)
+local function update_lg_can_state()
+    local can_prev = state.playlist_pos_1 > 1
+    local can_next = state.playlist_count > 1 and state.playlist_pos_1 < state.playlist_count
+    mp.set_property("liquid-glass-can-prev", can_prev and "yes" or "no")
+    mp.set_property("liquid-glass-can-next", can_next and "yes" or "no")
+end
+
 mp.register_event("start-file", request_init)
 mp.observe_property("track-list", "native", update_tracklist)
-observe_cached("playlist-count", request_init)
-observe_cached("playlist-pos-1", request_init)
+observe_cached("playlist-count", function()
+    request_init()
+    update_lg_can_state()
+end)
+observe_cached("playlist-pos-1", function()
+    request_init()
+    update_lg_can_state()
+end)
 observe_cached("chapter-list", function ()
     table.sort(state.chapter_list, function(a, b) return a.time < b.time end)
     request_init()
@@ -3568,20 +3554,10 @@ set_virt_mouse_area(0, 0, 0, 0, "window-controls-title")
 
 -- Direct mouse click handler (bypasses OSC event system)
 mp.add_forced_key_binding("mbtn_left", "video-click", function()
-    local mx = mp.get_property_number("mouse-pos/x")
     local my = mp.get_property_number("mouse-pos/y")
-    local bw = mp.get_property_number("osd-width")
     local bh = mp.get_property_number("osd-height")
-    -- Click above bottom bar area
-    if my and bw and bh and my < bh - 56 then
-        local left_zone = bw * 0.25
-        local right_zone = bw * 0.75
-        if mx < left_zone then
-            mp.command("playlist-prev")
-        elseif mx > right_zone then
-            mp.command("playlist-next")
-        else
-            mp.command("cycle pause")
-        end
+    -- Click anywhere on the video toggles play/pause
+    if my and bh and my < bh - 56 then
+        mp.command("cycle pause")
     end
 end)

@@ -30,6 +30,8 @@
 
 struct gl_liquid_glass_opts {
     bool enabled;
+    bool can_prev;
+    bool can_next;
     float power_factor;
     float width;
     float height;

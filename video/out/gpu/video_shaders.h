@@ -60,6 +60,6 @@ void pass_sample_unsharp(struct gl_shader_cache *sc, float param);
 
 void pass_draw_liquid_glass(struct gl_shader_cache *sc,
                             const struct gl_liquid_glass_opts *opts,
-                            bool paused);
+                            bool paused, bool can_prev, bool can_next);
 
 #endif

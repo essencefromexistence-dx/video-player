@@ -1040,7 +1040,7 @@ void pass_sample_unsharp(struct gl_shader_cache *sc, float param) {
 
 void pass_draw_liquid_glass(struct gl_shader_cache *sc,
                             const struct gl_liquid_glass_opts *opts,
-                            bool paused)
+                            bool paused, bool can_prev, bool can_next)
 {
     if (!opts->enabled)
         return;
@@ -1132,6 +1132,8 @@ void pass_draw_liquid_glass(struct gl_shader_cache *sc,
     GLSLHF("}\n");
 
     GLSLHF("float u_paused = %d;\n", paused ? 1 : 0);
+    GLSLHF("float u_canPrev = %d;\n", can_prev ? 1 : 0);
+    GLSLHF("float u_canNext = %d;\n", can_next ? 1 : 0);
 
     // ─── Per-element helper: renders one glass button ───────────────
     GLSLHF("bool lg_element(vec2 p, vec2 center, float radius, int icon,\n");
@@ -1175,20 +1177,16 @@ void pass_draw_liquid_glass(struct gl_shader_cache *sc,
     GLSLH(float mul = glow_val * gw * edge_factor + 1.0 + gb;)
     GLSLH(outcol = refrcol * vec4(vec3(mul), 1.0);)
 
+    // Icons removed — only center glass effect
+
     GLSLH(return true;)
-    GLSLHF("}\n");
+    GLSLHF("}\n"); // close lg_element
 
-    // Three glass buttons: prev (left), play (center), next (right)
-    GLSL(float cr = 0.12; float sr = 0.08;)
+    // Single center glass button only
+    GLSL(float cr = 0.12;)
     GLSL(vec2 cp = vec2(0.0, 0.0);)
-    GLSL(vec2 lp = vec2(-0.30, 0.0);)
-    GLSL(vec2 rp = vec2(0.30, 0.0);)
 
-    GLSLF("if (!lg_element(p, lp, sr, 3, u_powerFactor, u_a, u_b, u_c, u_d, u_fPower, u_blurRadius, u_blurIters, u_noise, u_glowWeight, u_glowBias, u_glowEdge0, u_glowEdge1, color)) {\n");
-    GLSLF("  if (!lg_element(p, rp, sr, 2, u_powerFactor, u_a, u_b, u_c, u_d, u_fPower, u_blurRadius, u_blurIters, u_noise, u_glowWeight, u_glowBias, u_glowEdge0, u_glowEdge1, color)) {\n");
-    GLSLF("    lg_element(p, cp, cr, 1, u_powerFactor, u_a, u_b, u_c, u_d, u_fPower, u_blurRadius, u_blurIters, u_noise, u_glowWeight, u_glowBias, u_glowEdge0, u_glowEdge1, color);\n");
-    GLSLF("  }\n");
-    GLSLF("}\n");
+    GLSLF("lg_element(p, cp, cr, 0, u_powerFactor, u_a, u_b, u_c, u_d, u_fPower, u_blurRadius, u_blurIters, u_noise, u_glowWeight, u_glowBias, u_glowEdge0, u_glowEdge1, color);\n");
 
     GLSLF("}\n"); // end block
 }
