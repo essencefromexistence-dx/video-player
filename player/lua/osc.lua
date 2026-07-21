@@ -127,8 +127,8 @@ local user_opts = {
     volume_mbtn_left_command = "no-osd cycle mute",
     volume_mbtn_mid_command = "",
     volume_mbtn_right_command = "script-binding select/select-audio-device; script-message-to osc osc-hide",
-    volume_wheel_down_command = "add volume -5",
-    volume_wheel_up_command = "add volume 5",
+    volume_wheel_down_command = "no-osd add volume -5",
+    volume_wheel_up_command = "no-osd add volume 5",
 
     fullscreen_mbtn_left_command = "cycle fullscreen",
     fullscreen_mbtn_mid_command = "",
@@ -1164,7 +1164,8 @@ local function render_elements(master_ass)
 
             elem_ass:draw_stop()
 
-            -- hover position indicator
+            -- hover position indicator (disabled for now)
+            --[[
             if slider_lo.hover_bar and element.slider.tooltipF ~= nil
                 and mouse_hit(element) then
 
@@ -1183,7 +1184,7 @@ local function render_elements(master_ass)
                 elem_ass:draw_stop()
             end
 
-            -- add tooltip
+            -- add tooltip (disabled for now)
             if element.slider.tooltipF ~= nil then
                 if mouse_hit(element) then
                     local sliderpos = get_slider_value(element)
@@ -1279,6 +1280,7 @@ local function render_elements(master_ass)
                     disable_thumbnail()
                 end
             end
+            --]]
 
         elseif element.type == "button" then
 
@@ -2007,30 +2009,13 @@ local function bar_layout(direction, slim)
 
     local seekbar_h = 12
     local ctrl_h = 18
-    local tc_pad = 6
 
     --==========================================================================
-    -- SEEKER ROW (top of bar, full width between timecodes)
+    -- SEEKER ROW: full width (timecodes moved to bottom right)
     --==========================================================================
 
-    -- Left timecode
-    local tc_left_w = tcW
-    geo = { x = osc_geo.x + padX + padwc_l, y = seekbar_row, an = 4,
-            w = tc_left_w, h = seekbar_h }
-    lo = add_layout("tc_left")
-    lo.geometry = geo
-    lo.style = osc_styles.timecodes
-
-    -- Right timecode
-    geo = { x = osc_geo.x + osc_geo.w - padX - padwc_r, y = seekbar_row, an = 6,
-            w = tc_left_w, h = seekbar_h }
-    lo = add_layout("tc_right")
-    lo.geometry = geo
-    lo.style = osc_styles.timecodes
-
-    -- Seekbar (full remaining width)
-    local sb_l = osc_geo.x + padX + padwc_l + tc_left_w + tc_pad
-    local sb_r = osc_geo.x + osc_geo.w - padX - padwc_r - tc_left_w - tc_pad
+    local sb_l = osc_geo.x + padX + padwc_l
+    local sb_r = osc_geo.x + osc_geo.w - padX - padwc_r
     local seekbar_w = math.max(0, sb_r - sb_l)
     local seekbar_cx = (sb_l + sb_r) / 2
 
@@ -2058,10 +2043,11 @@ local function bar_layout(direction, slim)
     lo.slider.rtype = user_opts["seekrangestyle"]
 
     --==========================================================================
-    -- CONTROLS ROW (bottom, left + right groups)
+    -- CONTROLS ROW: left group (playback) + title + right group (timecodes, fs, vol, tracks)
+    -- Layout order: [menu, plP, plN, PP, chP, chN] [title...] [audio, sub, vol, fs, tc_left, tc_right]
     --==========================================================================
 
-    -- Custom buttons
+    -- Custom buttons (far right)
     local ctrl_xR = osc_geo.x + osc_geo.w - padX - padwc_r
     for i = last_custom_button, 1, -1 do
         ctrl_xR = ctrl_xR - padX
@@ -2075,6 +2061,58 @@ local function bar_layout(direction, slim)
         end
     end
     ctrl_xR = ctrl_xR - padX
+
+    -- RIGHT GROUP (right to left): timecodes, fullscreen, volume, sub, audio
+    -- Right timecode
+    geo = { x = ctrl_xR, y = ctrl_row, an = 6, w = tcW, h = ctrl_h }
+    lo = add_layout("tc_right")
+    lo.geometry = geo
+    lo.style = osc_styles.timecodes
+    ctrl_xR = ctrl_xR - geo.w - padX
+
+    -- Left timecode
+    geo = { x = ctrl_xR, y = ctrl_row, an = 6, w = tcW, h = ctrl_h }
+    lo = add_layout("tc_left")
+    lo.geometry = geo
+    lo.style = osc_styles.timecodes
+    ctrl_xR = ctrl_xR - geo.w - padX
+
+    -- Fullscreen
+    geo = { x = ctrl_xR, y = ctrl_row, an = 6, w = buttonW, h = ctrl_h }
+    lo = add_layout("fullscreen")
+    lo.geometry = geo
+    lo.style = osc_styles.smallButtonsBar
+    lo.hitbox = { x2 = math.huge }
+    ctrl_xR = ctrl_xR - geo.w - padX
+
+    -- Volume
+    geo = { x = ctrl_xR, y = ctrl_row, an = 6, w = buttonW, h = ctrl_h }
+    lo = add_layout("volume")
+    lo.geometry = geo
+    lo.style = osc_styles.smallButtonsBar
+    ctrl_xR = ctrl_xR - geo.w - padX
+
+    -- Subtitle track
+    geo = { x = ctrl_xR, y = ctrl_row, an = 6, w = tsW, h = ctrl_h }
+    lo = add_layout("sub_track")
+    lo.geometry = geo
+    lo.style = osc_styles.smallButtonsBar
+    ctrl_xR = ctrl_xR - geo.w - padX
+
+    -- Audio track
+    geo = { x = ctrl_xR, y = ctrl_row, an = 6, w = tsW, h = ctrl_h }
+    lo = add_layout("audio_track")
+    lo.geometry = geo
+    lo.style = osc_styles.smallButtonsBar
+    ctrl_xR = ctrl_xR - geo.w - padX
+
+    -- Cache (after audio track if no window controls)
+    if not window_controls_enabled() or direction < 0 then
+        lo = add_layout("cache")
+        lo.geometry = { x = ctrl_xR, y = ctrl_row, an = 6, w = 150, h = ctrl_h }
+        lo.style = osc_styles.vidtitleBar
+        ctrl_xR = ctrl_xR - 150 - padX
+    end
 
     -- LEFT GROUP: menu, playlist, playback controls
     local ctrl_xL = osc_geo.x + padX + padwc_l
@@ -2122,51 +2160,17 @@ local function bar_layout(direction, slim)
     lo.style = osc_styles.smallButtonsBar
     ctrl_xL = ctrl_xL + geo.w + padX
 
-    -- Title (fills remaining space between left and right groups)
-    geo = { x = ctrl_xL, y = ctrl_row, an = 4,
-            w = math.max(0, ctrl_xR - ctrl_xL), h = ctrl_h }
-    lo = add_layout("title")
-    lo.geometry = geo
-    lo.style = string.format("%s{\\clip(%f,%f,%f,%f)}",
-        osc_styles.vidtitleBar,
-        geo.x, geo.y-geo.h, geo.w, geo.y+geo.h)
-
-    -- Cache (if not using window controls)
-    if not window_controls_enabled() or direction < 0 then
-        lo = add_layout("cache")
-        lo.geometry = { x = ctrl_xR, y = ctrl_row, an = 6, w = 150, h = ctrl_h }
-        lo.style = osc_styles.vidtitleBar
-        ctrl_xR = ctrl_xR - 150 - padX
+    -- Title (fills remaining space)
+    local title_w = math.max(0, ctrl_xR - ctrl_xL)
+    if title_w > 0 then
+        geo = { x = ctrl_xL, y = ctrl_row, an = 4, w = title_w, h = ctrl_h }
+        lo = add_layout("title")
+        lo.geometry = geo
+        lo.style = string.format("%s{\\clip(%f,%f,%f,%f)}",
+            osc_styles.vidtitleBar,
+            geo.x, geo.y-geo.h, geo.w, geo.y+geo.h)
     end
 
-    -- RIGHT GROUP: fullscreen, volume, track selectors
-    -- Fullscreen
-    geo = { x = ctrl_xR, y = ctrl_row, an = 6, w = buttonW, h = ctrl_h }
-    lo = add_layout("fullscreen")
-    lo.geometry = geo
-    lo.style = osc_styles.smallButtonsBar
-    lo.hitbox = { x2 = math.huge }
-    ctrl_xR = ctrl_xR - geo.w - padX
-
-    -- Volume
-    geo = { x = ctrl_xR, y = ctrl_row, an = 6, w = buttonW, h = ctrl_h }
-    lo = add_layout("volume")
-    lo.geometry = geo
-    lo.style = osc_styles.smallButtonsBar
-    ctrl_xR = ctrl_xR - geo.w - padX
-
-    -- Subtitle track
-    geo = { x = ctrl_xR, y = ctrl_row, an = 6, w = tsW, h = ctrl_h }
-    lo = add_layout("sub_track")
-    lo.geometry = geo
-    lo.style = osc_styles.smallButtonsBar
-    ctrl_xR = ctrl_xR - geo.w - padX
-
-    -- Audio track
-    geo = { x = ctrl_xR, y = ctrl_row, an = 6, w = tsW, h = ctrl_h }
-    lo = add_layout("audio_track")
-    lo.geometry = geo
-    lo.style = osc_styles.smallButtonsBar
 end
 
 layouts["bottombar"] = function()
@@ -3154,29 +3158,14 @@ local function render_logo()
     end
     local display_h = 360
     local display_w = display_h * state.osd_dimensions.aspect
-    -- DX logo centered
-    local line_prefix = ("{\\rDefault\\an5\\1a&H00&\\bord0\\shad0\\pos(%f,%f)}"):format(
-        display_w / 2, display_h / 2 - 20)
 
     local ass = assdraw.ass_new()
-    for _, line in ipairs(logo_lines) do
-        ass:new_event()
-        ass:append(line_prefix .. line)
-    end
-
-    -- Santa hat
-    if is_december and not user_opts.greenandgrumpy then
-        for _, line in ipairs(santa_hat_lines) do
-            ass:new_event()
-            ass:append(line_prefix .. line)
-        end
-    end
 
     if state.idle_active then
         ass:new_event()
-        ass:pos(display_w / 2, display_h / 2 + 40)
-        ass:an(8)
-        ass:append("Drop files or URLs to play here.")
+        ass:pos(display_w / 2, display_h / 2)
+        ass:an(5)
+        ass:append("{\\fs28\\bord0\\shad0\\1c&HFFFFFF&}Drop files or URLs to play here.")
     end
     set_osd(state.logo_osd, display_w, display_h, ass.text, -1000)
 end

@@ -1032,6 +1032,7 @@ static const struct MPOpts mp_default_opts = {
 #endif
     .auto_load_scripts = true,
     .loop_times = 1,
+    .loop_file = -1,
     .ordered_chapters = true,
     .chapter_merge_threshold = 100,
     .chapter_seek_threshold = 5.0,
