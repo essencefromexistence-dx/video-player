@@ -1493,9 +1493,9 @@ local function window_controls(topbar)
         }
         lo.style = osc_styles.floatingBox
     else
-        lo.alpha[1] = user_opts.boxalpha
+        lo.alpha[1] = 0
         lo.geometry = wc_geo
-        lo.style = osc_styles.wcBar
+        lo.style = "{\\rDefault\\blur0\\bord0\\1c&H000000&}"
     end
 
     local button_y = wc_geo.y - (wc_geo.h / 2)
@@ -2915,7 +2915,6 @@ local function process_event(source, what)
 
             end
         end
-
     elseif what == "up" then
 
         if elements[state.active_element] then
@@ -2934,6 +2933,14 @@ local function process_event(source, what)
                 elements[n].eventresponder["reset"](elements[n])
             end
 
+        end
+        -- Video area click: if no element was hit, toggle play/pause
+        if state.active_element == nil and source == "mbtn_left" then
+            local my = mp.get_property_number("mouse-pos/y")
+            local bh = mp.get_property_number("osd-height")
+            if my and bh and my < bh - 56 then
+                mp.command("cycle pause")
+            end
         end
         state.active_element = nil
         state.mouse_down_counter = 0
@@ -3552,18 +3559,23 @@ set_virt_mouse_area(0, 0, 0, 0, "input")
 set_virt_mouse_area(0, 0, 0, 0, "window-controls")
 set_virt_mouse_area(0, 0, 0, 0, "window-controls-title")
 
--- Show liquid glass and OSC on any mouse move (bypasses showhide group)
-mp.add_forced_key_binding("mouse_move", "lg-mouse", function()
+-- Always-active mouse bindings (outside OSC's "input" group which gets disabled on auto-hide)
+mp.add_key_binding("mouse_move", "lg-show", function()
     lg_show()
     show_osc()
 end)
+mp.set_key_bindings({
+    {"mbtn_left", function() end,
+                   function()
+        local my = mp.get_property_number("mouse-pos/y")
+        local bh = mp.get_property_number("osd-height")
+        if my and bh and my < bh - 56 then
+            mp.command("cycle pause")
+        end
+    end},
+}, "video-click", "force")
+mp.enable_key_bindings("video-click")
 
--- Direct mouse click handler (bypasses OSC event system)
-mp.add_forced_key_binding("mbtn_left", "video-click", function()
-    local my = mp.get_property_number("mouse-pos/y")
-    local bh = mp.get_property_number("osd-height")
-    -- Click anywhere on the video toggles play/pause
-    if my and bh and my < bh - 56 then
-        mp.command("cycle pause")
-    end
-end)
+
+
+
