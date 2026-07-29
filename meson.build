@@ -28,7 +28,7 @@ libswresample = dependency('libswresample', version: '>= 4.12.100')
 libswscale = dependency('libswscale', version: '>= 7.5.100')
 
 libplacebo = dependency('libplacebo', version: '>=7.360.1',
-                default_options: ['default_library=static', 'demos=false'])
+                default_options: ['default_library=static', 'demos=false', 'c_std=c17', 'warning_level=0'])
 
 libass = dependency('libass', version: '>= 0.12.2')
 
