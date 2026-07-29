@@ -1,3 +1,9 @@
-/subprojects/*
-!/subprojects/packagefiles
-!/subprojects/*.wrap
+*.dll
+*.pdb
+*.exp
+*.lib
+*.obj
+*.o
+*.a
+*.so
+build*/
