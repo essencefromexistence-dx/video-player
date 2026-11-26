@@ -44,27 +44,3 @@ Common build options:
 Build outputs are named `dx-video-player` and `libdx-video-player`. The public
 API headers remain under `include/mpv`, so client applications use the libmpv
 API.
-
-## License
-
-The license depends on the build configuration:
-
-- The default build is GPLv2-or-later.
-- A build with `-Dgpl=false` is LGPL2.1-or-later only when GPL-only files are
-  excluded and every linked dependency permits LGPL licensing.
-
-The authoritative licensing notes are in `Copyright`. The license texts are in
-`LICENSE.GPL` and `LICENSE.LGPL`. Dependency notices are in
-`THIRD-PARTY-NOTICES.md`.
-
-## Distribution
-
-Binary releases must include the applicable license texts and notices, and
-must provide access to the source that matches the distributed binary. Release
-requirements are documented in `RELEASE-COMPLIANCE.md`.
-
-## Integration
-
-Applications can launch `dx-video-player` as a separate process. Linking the
-client library or copying mpv source into another product follows the GPL or
-LGPL terms described in `Copyright`.
