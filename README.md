@@ -1,58 +1,70 @@
 # DX Video Player
 
-DX-branded fork of mpv. This repository builds a native `dx-video-player`
-executable and an ABI-compatible `libdx-video-player` library. It is not a thin
-wrapper around a system mpv installation.
+DX Video Player is a source fork of mpv. It builds a standalone player
+executable and an `libmpv`-compatible client library. The repository retains
+the mpv source tree, build system, and public API headers, with DX branding on
+the output names and resources.
 
-## License
+## Overview
 
-This fork follows mpv's build-dependent licensing model:
-
-| Build configuration | License of the resulting combined work |
+| Item | Value |
 | --- | --- |
-| Default `-Dgpl=true` | GPLv2-or-later |
-| `-Dgpl=false`, excluding GPL-only files, with LGPL-compatible dependencies | LGPL2.1-or-later |
+| Repository | https://github.com/essencefromexistence-dx/video-player |
+| Project name | `dx-video-player` |
+| Default build | GPLv2-or-later |
+| Optional build | LGPL2.1-or-later with `-Dgpl=false` and compatible dependencies |
 
-`Copyright` is the authoritative licensing document. Renaming the project or
-its output files does not change the license of the copied mpv source. Passing
-`-Dgpl=false` by itself does not create an LGPL grant.
+## Requirements
 
-The current DX build configuration uses the GPL route: the Meson default is
-`gpl=true` (`meson.options:2`), the hub build driver does not override it
-(`G:\Dx\build.ps1:455-462`), and the Windows version resource declares
-GPLv2-or-later (`osdep/mpv.rc:32`). Treat the resulting binaries as GPLv2+.
+- Meson 1.3 or newer
+- Ninja
+- C11 compiler
+- FFmpeg, libass, and libplacebo development files
 
-## Source offer
-
-Public source: https://github.com/essencefromexistence-dx/video-player
-
-Every binary release must identify the exact source commit or tag and provide
-an equivalent source archive or link alongside the binary distribution. The
-source bundle must include the dependency source actually used, including any
-local modifications to subprojects.
-
-See `RELEASE-COMPLIANCE.md` and `THIRD-PARTY-NOTICES.md`.
+Optional features may require additional libraries. See `meson.options` for the
+full option list.
 
 ## Building
-
-The normal Meson build is:
 
 ```sh
 meson setup build
 meson compile -C build
 ```
 
-DX release builds currently use static mpv core objects, Lua 5.1, and GPL
-FFmpeg for the MSVC targets. An LGPL build requires `-Dgpl=false`, an FFmpeg
-build without `--enable-gpl`, and an audit of every linked dependency.
+Common build options:
 
-## Using from other DX products
+| Option | Effect |
+| --- | --- |
+| `-Dgpl=false` | Excludes GPL-only mpv source files |
+| `-Dcplayer=false` | Builds the client library without the player executable |
+| `-Dlibmpv=false` | Builds the player executable without a separate library target |
+| `-Ddefault_library=static` | Builds static libraries |
+| `-Ddefault_library=shared` | Builds shared libraries |
 
-Other DX products may launch `dx-video-player` as a separate process without
-becoming GPL merely by calling it. Copying mpv source into another product, or
-linking `libmpv` into it, changes the licensing analysis.
+Build outputs are named `dx-video-player` and `libdx-video-player`. The public
+API headers remain under `include/mpv`, so client applications use the libmpv
+API.
 
-## Notices
+## License
 
-`Copyright`, `LICENSE.GPL`, and `LICENSE.LGPL` are the project license files.
-Additional dependency notices are listed in `THIRD-PARTY-NOTICES.md`.
+The license depends on the build configuration:
+
+- The default build is GPLv2-or-later.
+- A build with `-Dgpl=false` is LGPL2.1-or-later only when GPL-only files are
+  excluded and every linked dependency permits LGPL licensing.
+
+The authoritative licensing notes are in `Copyright`. The license texts are in
+`LICENSE.GPL` and `LICENSE.LGPL`. Dependency notices are in
+`THIRD-PARTY-NOTICES.md`.
+
+## Distribution
+
+Binary releases must include the applicable license texts and notices, and
+must provide access to the source that matches the distributed binary. Release
+requirements are documented in `RELEASE-COMPLIANCE.md`.
+
+## Integration
+
+Applications can launch `dx-video-player` as a separate process. Linking the
+client library or copying mpv source into another product follows the GPL or
+LGPL terms described in `Copyright`.
